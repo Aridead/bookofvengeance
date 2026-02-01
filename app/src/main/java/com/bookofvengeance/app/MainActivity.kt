@@ -32,7 +32,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -48,6 +47,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDecoration
@@ -88,6 +88,11 @@ data class SyndicateEntry(
 enum class Gender {
     BROTHER,
     SISTER
+}
+
+enum class Tab {
+    Notebook,
+    Syndicate
 }
 
 @Composable
@@ -394,13 +399,15 @@ private fun TabBar(activeTab: Tab, onTabSelected: (Tab) -> Unit) {
             isActive = activeTab == Tab.Notebook,
             label = "Блокнот",
             icon = Icons.Default.AutoStories,
-            onClick = { onTabSelected(Tab.Notebook) }
+            onClick = { onTabSelected(Tab.Notebook) },
+            iconRes = null
         )
         TabButton(
             isActive = activeTab == Tab.Syndicate,
             label = "Синдикат",
-            icon = Icons.Default.AutoAwesome,
-            onClick = { onTabSelected(Tab.Syndicate) }
+            icon = null,
+            onClick = { onTabSelected(Tab.Syndicate) },
+            iconRes = R.drawable.ic_syndicate_placeholder
         )
     }
 }
@@ -409,8 +416,9 @@ private fun TabBar(activeTab: Tab, onTabSelected: (Tab) -> Unit) {
 private fun TabButton(
     isActive: Boolean,
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit
+    icon: androidx.compose.ui.graphics.vector.ImageVector?,
+    onClick: () -> Unit,
+    iconRes: Int?
 ) {
     val background = if (isActive) BookColors.purple else BookColors.paper
     val textColor = if (isActive) BookColors.gold else BookColors.purple
@@ -426,7 +434,15 @@ private fun TabButton(
         contentAlignment = Alignment.Center
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(imageVector = icon, contentDescription = label, tint = textColor)
+            if (iconRes != null) {
+                Icon(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = label,
+                    tint = textColor
+                )
+            } else if (icon != null) {
+                Icon(imageVector = icon, contentDescription = label, tint = textColor)
+            }
             Spacer(modifier = Modifier.width(8.dp))
             Text(text = label, color = textColor)
         }
