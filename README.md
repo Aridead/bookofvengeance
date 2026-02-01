@@ -14,3 +14,15 @@
 ## Быстрый старт
 
 Откройте проект в Android Studio и соберите приложение.
+
+## Если сборка падает из-за SDK location not found
+
+Ошибка `SDK location not found` означает, что Gradle не видит Android SDK. Нужно:
+
+1. Убедиться, что Android SDK установлен в Android Studio.
+2. Либо задать переменную окружения `ANDROID_HOME`,
+3. Либо создать файл `local.properties` в корне проекта и прописать путь к SDK:
+
+```
+sdk.dir=C:\\Users\\<ваш_пользователь>\\AppData\\Local\\Android\\Sdk
+```
