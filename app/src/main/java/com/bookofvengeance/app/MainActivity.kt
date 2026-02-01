@@ -49,10 +49,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -62,6 +64,7 @@ private const val KEY_PROFILE_STATUS = "profile_status"
 private const val KEY_PROFILE_GENDER = "profile_gender"
 private const val KEY_PROFILE_REVENGE = "profile_revenge"
 private const val KEY_NOTES = "notes"
+private const val KEY_NOTE_ENTRIES = "note_entries"
 private const val KEY_SYNDICATE = "syndicate"
 
 class MainActivity : ComponentActivity() {
@@ -85,6 +88,11 @@ data class SyndicateEntry(
     val avenged: Boolean
 )
 
+data class NoteEntry(
+    val text: String,
+    val imageUri: String?
+)
+
 enum class Gender {
     BROTHER,
     SISTER
@@ -102,6 +110,7 @@ private fun BookApp(prefs: SharedPreferences) {
     val gender = rememberSaveable { mutableStateOf(loadGender(prefs)) }
     val revengeCount = rememberSaveable { mutableIntStateOf(prefs.getInt(KEY_PROFILE_REVENGE, 0)) }
     val notes = rememberSaveable { mutableStateOf(prefs.getString(KEY_NOTES, "") ?: "") }
+    val noteEntries = rememberSaveable { mutableStateOf(loadNotes(prefs)) }
     val syndicate = rememberSaveable { mutableStateOf(loadSyndicate(prefs)) }
     val activeTab = rememberSaveable { mutableStateOf(Tab.Notebook) }
 
@@ -138,9 +147,14 @@ private fun BookApp(prefs: SharedPreferences) {
             when (activeTab.value) {
                 Tab.Notebook -> NotebookScreen(
                     notes = notes.value,
+                    entries = noteEntries.value,
                     onNotesChange = {
                         notes.value = it
                         prefs.edit().putString(KEY_NOTES, notes.value).apply()
+                    },
+                    onEntriesChange = {
+                        noteEntries.value = it
+                        saveNotes(prefs, noteEntries.value)
                     }
                 )
 
@@ -189,64 +203,68 @@ private fun ProfileHeader(
         colors = CardDefaults.cardColors(containerColor = BookColors.purple),
         shape = RoundedCornerShape(18.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Row(
                 modifier = Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-                    .background(BookColors.paper)
-                    .border(2.dp, BookColors.gold, CircleShape),
-                contentAlignment = Alignment.Center
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.AutoStories,
-                    contentDescription = "Profile image placeholder",
-                    tint = BookColors.purple
-                )
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Профиль",
-                    style = MaterialTheme.typography.titleMedium.copy(color = BookColors.gold)
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                TextField(
-                    value = name,
-                    onValueChange = onNameChange,
-                    placeholder = { Text(text = "Имя") },
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = BookColors.paper,
-                        unfocusedContainerColor = BookColors.paper
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = status,
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        color = BookColors.gold,
-                        fontFamily = BookFontFamilies.graffiti
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(BookColors.paper)
+                        .border(2.dp, BookColors.gold, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoStories,
+                        contentDescription = "Profile image placeholder",
+                        tint = BookColors.purple
                     )
-                )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    TextField(
+                        value = name,
+                        onValueChange = onNameChange,
+                        placeholder = { Text(text = "Имя") },
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = BookColors.paper,
+                            unfocusedContainerColor = BookColors.paper
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = status,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            color = BookColors.gold,
+                            fontFamily = BookFontFamilies.graffiti
+                        )
+                    )
+                }
             }
+            ChainOverlay()
         }
     }
 }
 
 @Composable
-private fun NotebookScreen(notes: String, onNotesChange: (String) -> Unit) {
+private fun NotebookScreen(
+    notes: String,
+    entries: List<NoteEntry>,
+    onNotesChange: (String) -> Unit,
+    onEntriesChange: (List<NoteEntry>) -> Unit
+) {
+    val entryText = rememberSaveable { mutableStateOf("") }
+    val imageUri = rememberSaveable { mutableStateOf("") }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(
             text = "Блокнот",
@@ -255,15 +273,97 @@ private fun NotebookScreen(notes: String, onNotesChange: (String) -> Unit) {
         )
         Spacer(modifier = Modifier.height(12.dp))
         TextField(
+            value = entryText.value,
+            onValueChange = { entryText.value = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Новая запись...") },
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = BookColors.paper,
+                unfocusedContainerColor = BookColors.paper
+            )
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        TextField(
+            value = imageUri.value,
+            onValueChange = { imageUri.value = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Ссылка/URI на изображение (необязательно)") },
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = BookColors.paper,
+                unfocusedContainerColor = BookColors.paper
+            )
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(
+            onClick = {
+                if (entryText.value.isNotBlank()) {
+                    onEntriesChange(
+                        entries + NoteEntry(
+                            text = entryText.value.trim(),
+                            imageUri = imageUri.value.trim().ifBlank { null }
+                        )
+                    )
+                    entryText.value = ""
+                    imageUri.value = ""
+                }
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = BookColors.purple)
+        ) {
+            Text(text = "Добавить запись", color = BookColors.gold)
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(entries) { entry ->
+                NoteEntryCard(entry = entry)
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "Черновик",
+            style = MaterialTheme.typography.titleMedium,
+            color = BookColors.purple
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        TextField(
             value = notes,
             onValueChange = onNotesChange,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("Пиши всё, что нужно помнить...") },
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = BookColors.paper,
                 unfocusedContainerColor = BookColors.paper
             )
         )
+    }
+}
+
+@Composable
+private fun NoteEntryCard(entry: NoteEntry) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = BookColors.paper),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+            Text(
+                text = entry.text,
+                style = MaterialTheme.typography.bodyLarge,
+                color = BookColors.purple
+            )
+            if (!entry.imageUri.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                AsyncImage(
+                    model = entry.imageUri,
+                    contentDescription = "Note image",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                )
+            }
+        }
     }
 }
 
@@ -278,7 +378,7 @@ private fun SyndicateScreen(
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(
-            text = "Синдикат",
+            text = "Проступки",
             style = MaterialTheme.typography.titleLarge,
             color = BookColors.purple
         )
@@ -404,7 +504,7 @@ private fun TabBar(activeTab: Tab, onTabSelected: (Tab) -> Unit) {
         )
         TabButton(
             isActive = activeTab == Tab.Syndicate,
-            label = "Синдикат",
+            label = "Проступки",
             icon = null,
             onClick = { onTabSelected(Tab.Syndicate) },
             iconRes = R.drawable.ic_syndicate_placeholder
@@ -483,6 +583,37 @@ private fun resolveStatusTitle(revengeCount: Int, gender: Gender?): String {
     }
 }
 
+@Composable
+private fun ChainOverlay() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        ChainRow()
+        ChainRow()
+    }
+}
+
+@Composable
+private fun ChainRow() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(8) { _ ->
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, BookColors.gold, CircleShape)
+            )
+        }
+    }
+}
+
 private enum class StatusTier {
     LITTLE,
     MIDDLE,
@@ -516,18 +647,22 @@ private fun saveProfile(
 
 private fun loadSyndicate(prefs: SharedPreferences): List<SyndicateEntry> {
     val raw = prefs.getString(KEY_SYNDICATE, "[]") ?: "[]"
-    val array = JSONArray(raw)
-    return buildList {
-        for (i in 0 until array.length()) {
-            val item = array.getJSONObject(i)
-            add(
-                SyndicateEntry(
-                    name = item.optString("name"),
-                    offense = item.optString("offense"),
-                    avenged = item.optBoolean("avenged")
+    return try {
+        val array = JSONArray(raw)
+        buildList {
+            for (i in 0 until array.length()) {
+                val item = array.getJSONObject(i)
+                add(
+                    SyndicateEntry(
+                        name = item.optString("name"),
+                        offense = item.optString("offense"),
+                        avenged = item.optBoolean("avenged")
+                    )
                 )
-            )
+            }
         }
+    } catch (exception: Exception) {
+        emptyList()
     }
 }
 
@@ -543,6 +678,37 @@ private fun saveSyndicate(prefs: SharedPreferences, entries: List<SyndicateEntry
     prefs.edit().putString(KEY_SYNDICATE, array.toString()).apply()
 }
 
+private fun loadNotes(prefs: SharedPreferences): List<NoteEntry> {
+    val raw = prefs.getString(KEY_NOTE_ENTRIES, "[]") ?: "[]"
+    return try {
+        val array = JSONArray(raw)
+        buildList {
+            for (i in 0 until array.length()) {
+                val item = array.getJSONObject(i)
+                add(
+                    NoteEntry(
+                        text = item.optString("text"),
+                        imageUri = item.optString("imageUri").ifBlank { null }
+                    )
+                )
+            }
+        }
+    } catch (exception: Exception) {
+        emptyList()
+    }
+}
+
+private fun saveNotes(prefs: SharedPreferences, entries: List<NoteEntry>) {
+    val array = JSONArray()
+    entries.forEach { entry ->
+        val item = JSONObject()
+        item.put("text", entry.text)
+        item.put("imageUri", entry.imageUri ?: "")
+        array.put(item)
+    }
+    prefs.edit().putString(KEY_NOTE_ENTRIES, array.toString()).apply()
+}
+
 object BookColors {
     val purple = androidx.compose.ui.graphics.Color(0xFF4A2C7F)
     val gold = androidx.compose.ui.graphics.Color(0xFFF2C66D)
@@ -551,9 +717,8 @@ object BookColors {
 }
 
 object BookFontFamilies {
-    // TODO: Replace with actual Comic Sans and Graffiti Stroke font resources once added to res/font.
-    val comicSans: FontFamily = FontFamily.Default
-    val graffiti: FontFamily = FontFamily.Default
+    val comicSans: FontFamily = FontFamily(Font(R.font.comic_sans))
+    val graffiti: FontFamily = FontFamily(Font(R.font.graffiti_stroke))
 }
 
 @Composable
