@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -251,7 +250,7 @@ private fun ProfileHeader(
                     )
                 }
             }
-            ChainOverlay(modifier = Modifier.matchParentSize())
+            ChainOverlay()
         }
     }
 }
@@ -585,22 +584,21 @@ private fun resolveStatusTitle(revengeCount: Int, gender: Gender?): String {
 }
 
 @Composable
-private fun ChainOverlay(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.SpaceBetween
+private fun ChainOverlay() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        ChainRow()
-        ChainRow()
+        ChainRow(modifier = Modifier.align(Alignment.TopCenter))
+        ChainRow(modifier = Modifier.align(Alignment.BottomCenter))
     }
 }
 
 @Composable
-private fun ChainRow() {
+private fun ChainRow(modifier: Modifier) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
